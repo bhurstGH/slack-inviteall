@@ -2,15 +2,20 @@
 require("dotenv").config();
 const axios = require("axios");
 
+// Store Slack access token in a .env file in the root folder
 const accessToken = process.env.SLACK_ACCESS_TOKEN;
 
 async function getConversationId(conversation) {
 
+  // Trim the pound sign if it was provided in the conversation argument
   if (conversation.startsWith('#')) {
     conversation = conversation.slice(1)
   }
+
+  // Destructuring to pull out the channels result from the response
   const { data: { channels } } = await axios.get(`https://slack.com/api/conversations.list?token=${accessToken}&pretty=1`)
 
+  // Find the channel with matching conversation name and pull out its ID
   const conversationId = channels.find(chan => chan.name === conversation).id
 
   return conversationId
@@ -21,11 +26,12 @@ async function getConversationMembers(conversationId) {
   async function queryForMembers(membersCollection = [], nextCursor = '') {
     let allConversationMembers = [];
 
+    // Base case: members exist, no next cursor, we've retrieved all the members
     if (membersCollection.length > 0 && !nextCursor) {
       return membersCollection;
     }
-    try {
 
+    try {
       const response = await axios.get(
         `https://slack.com/api/conversations.members?token=${accessToken}&channel=${conversationId}${nextCursor}`
       );
@@ -37,10 +43,13 @@ async function getConversationMembers(conversationId) {
         }
       } = response;
 
+      // Cursor seems to always end with =
+      // Replace with URL encoding, %3D
       if (next_cursor) {
         next_cursor = `&cursor=${next_cursor.replace('=', '%3D')}`
       }
 
+      // Combine previous member grouping with previous
       allConversationMembers = [...members, ...membersCollection]
 
       return await queryForMembers(allConversationMembers, next_cursor)
@@ -53,9 +62,6 @@ async function getConversationMembers(conversationId) {
 
   return await queryForMembers()
 }
-
-// getConversationMembers('CKMLYAPDY')
-// getConversationId('dev-chatter')
 
 async function inviteMembers(sourceChannel, targetChannel) {
 
@@ -71,4 +77,4 @@ async function inviteMembers(sourceChannel, targetChannel) {
   console.log(result)
 }
 
-inviteMembers('invitetest', 'dev-chatter')
+inviteMembers(process.argv[2], process.argv[3])
