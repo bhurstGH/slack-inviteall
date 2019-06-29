@@ -3,9 +3,7 @@ require("dotenv").config();
 const axios = require("axios");
 
 // Store Slack access token in a .env file in the root folder
-// Your own user Id to prevent errors with self inviting
 const accessToken = process.env.SLACK_ACCESS_TOKEN;
-const myId = process.env.MY_ID;
 
 async function getConversationId(conversation) {
 
@@ -38,6 +36,7 @@ async function getConversationMembers(conversationId) {
         `https://slack.com/api/conversations.members?token=${accessToken}&channel=${conversationId}${nextCursor}`
       );
 
+      // Looks ugly, but pulling out members and next_cursor
       let {
         data: {
           members,
@@ -51,7 +50,7 @@ async function getConversationMembers(conversationId) {
         next_cursor = `&cursor=${next_cursor.replace('=', '%3D')}`
       }
 
-      // Combine previous member grouping with previous
+      // Combine member grouping with previous
       allConversationMembers = [...members, ...membersCollection]
 
       return await queryForMembers(allConversationMembers, next_cursor)
@@ -62,31 +61,39 @@ async function getConversationMembers(conversationId) {
 
   }
 
+  // Kick off recursive call
   return await queryForMembers()
 }
 
 async function inviteMembers(sourceChannel, targetChannel) {
 
+  // Basic check for 2 arguments
   if (process.argv.length !== 4) {
     return console.log("Please supply a source channel and a target channel")
   }
 
+  // Retrieve the ID of the source and target channels for member access
   const sourceId = await getConversationId(sourceChannel)
   const targetId = await getConversationId(targetChannel)
 
+  // Retrieve member lists for comparison
   const sourceMembers = await getConversationMembers(sourceId)
   const targetMembers = await getConversationMembers(targetId)
 
+  // Combine member lists and remove duplicate members.
+  // Filter out members that are already in target channel.
+  // This prevents cants_invite_self and already_in_channel errors
   const membersToInvite = [...new Set([...sourceMembers, ...targetMembers])]
     .filter(member => !targetMembers.includes(member))
 
-  console.log(membersToInvite.join("%2C"))
-
+  // Slack API limits the number of invites.
+  // Make a new request 20 entries at a time while members remain in the array.
   while (membersToInvite.length > 0) {
     const batch = membersToInvite.splice(0, 20);
 
-    console.log(batch)
+    // result currently unused--possible future use.
     const result = await axios.post(`https://slack.com/api/conversations.invite?token=${accessToken}&channel=${targetId}&users=${batch.join('%2C')}`)
+    console.log(`${batch.length} members invite.`)
   }
 }
 
