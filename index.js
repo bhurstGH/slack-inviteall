@@ -3,7 +3,9 @@ require("dotenv").config();
 const axios = require("axios");
 
 // Store Slack access token in a .env file in the root folder
+// Your own user Id to prevent errors with self inviting
 const accessToken = process.env.SLACK_ACCESS_TOKEN;
+const myId = process.env.MY_ID;
 
 async function getConversationId(conversation) {
 
@@ -65,16 +67,27 @@ async function getConversationMembers(conversationId) {
 
 async function inviteMembers(sourceChannel, targetChannel) {
 
+  if (process.argv.length !== 4) {
+    return console.log("Please supply a source channel and a target channel")
+  }
+
   const sourceId = await getConversationId(sourceChannel)
   const targetId = await getConversationId(targetChannel)
 
   const sourceMembers = await getConversationMembers(sourceId)
+  const targetMembers = await getConversationMembers(targetId)
 
-  console.log(`&users=${sourceMembers.join('%2C')}`)
+  const membersToInvite = [...new Set([...sourceMembers, ...targetMembers])]
+    .filter(member => !targetMembers.includes(member))
 
-  const result = await axios.post(`https://slack.com/api/conversations.invite?token=${accessToken}&channel=${targetId}&users=${sourceMembers.join('%2C')}`)
+  console.log(membersToInvite.join("%2C"))
 
-  console.log(result)
+  while (membersToInvite.length > 0) {
+    const batch = membersToInvite.splice(0, 20);
+
+    console.log(batch)
+    const result = await axios.post(`https://slack.com/api/conversations.invite?token=${accessToken}&channel=${targetId}&users=${batch.join('%2C')}`)
+  }
 }
 
 inviteMembers(process.argv[2], process.argv[3])
