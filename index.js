@@ -93,7 +93,7 @@ async function inviteMembers(sourceChannel, targetChannel) {
 
     // result currently unused--possible future use.
     const result = await axios.post(`https://slack.com/api/conversations.invite?token=${accessToken}&channel=${targetId}&users=${batch.join('%2C')}`)
-    console.log(`${batch.length} members invite.`)
+    console.log(`${batch.length} members invited.`)
   }
 }
 
